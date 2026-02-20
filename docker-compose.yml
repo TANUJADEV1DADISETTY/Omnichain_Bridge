@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  chain-a:
+    image: ghcr.io/foundry-rs/foundry:latest
+    command: anvil --host 0.0.0.0 --port 8545 --chain-id 1111
+    ports:
+      - "8545:8545"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8545"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  chain-b:
+    image: ghcr.io/foundry-rs/foundry:latest
+    command: anvil --host 0.0.0.0 --port 9545 --chain-id 2222
+    ports:
+      - "9545:9545"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "9545"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  relayer:
+    build: ./relayer
+    restart: on-failure
+    environment:
+      CHAIN_A_RPC_URL: http://chain-a:8545
+      CHAIN_B_RPC_URL: http://chain-b:9545
+      DEPLOYER_PRIVATE_KEY: ${DEPLOYER_PRIVATE_KEY}
+      CONFIRMATION_DEPTH: 3
+    volumes:
+      - ./relayer_data:/usr/src/app/data
+      - ./deployments:/usr/src/app/deployments
+    depends_on:
+      chain-a:
+        condition: service_healthy
+      chain-b:
+        condition: service_healthy
